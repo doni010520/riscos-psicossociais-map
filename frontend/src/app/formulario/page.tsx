@@ -48,44 +48,46 @@ export default function FormularioPage() {
       const formAnswers: FormAnswers = {
         demandas: [],
         controle: [],
-        relacionamento: [],
-        cargo: [],
-        mudanca: [],
         apoio_chefia: [],
-        apoio_colegas: []
+        relacionamentos: [],
+        papel: [],
+        mudanca: [],
       };
 
-      QUESTIONS.forEach(q => {
-        const answer = answers[q.id];
+      QUESTIONS.forEach((question) => {
+        const answer = answers[question.id];
         if (answer !== undefined) {
-          formAnswers[q.dimension][q.index] = answer;
+          formAnswers[question.dimension].push({
+            question_id: question.id,
+            question_text: question.text,
+            score: answer,
+          });
         }
       });
 
       // Calcular tempo de preenchimento
-      const completionTimeSeconds = Math.round((Date.now() - startTime) / 1000);
+      const completionTime = Math.floor((Date.now() - startTime) / 1000);
 
-      // Enviar para o backend
-      await submitForm({
-        answers: formAnswers,
-        completionTimeSeconds,
-        userAgent: navigator.userAgent
-      });
+      // Enviar para API
+      await submitForm(formAnswers, completionTime);
+
+      // Log de conclusão
+      await logAccess('form_completion');
 
       // Redirecionar para página de agradecimento
       router.push('/obrigado');
     } catch (err) {
       console.error('Erro ao enviar formulário:', err);
-      setError('Erro ao enviar suas respostas. Por favor, tente novamente.');
+      setError('Erro ao enviar o formulário. Por favor, tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+    <div className="min-h-screen">
+      {/* Header com glassmorphism */}
+      <header className="glass-card water-drop mb-8">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center gap-4">
             <Image
@@ -93,13 +95,13 @@ export default function FormularioPage() {
               alt="MAP Logo"
               width={60}
               height={60}
-              className="rounded-lg"
+              className="rounded-lg drop-shadow-2xl"
             />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-white">
                 Avaliação de Riscos Psicossociais
               </h1>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-blue-200 mt-1">
                 Questionário anônimo • 35 perguntas • Escala de 0 a 10
               </p>
             </div>
@@ -110,7 +112,7 @@ export default function FormularioPage() {
       {/* Conteúdo principal */}
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Barra de progresso geral */}
-        <div className="mb-8 bg-white rounded-lg shadow-sm p-6">
+        <div className="mb-8 glass-card p-6">
           <ProgressBar
             current={answeredCount}
             total={QUESTIONS.length}
@@ -119,22 +121,22 @@ export default function FormularioPage() {
         </div>
 
         {/* Instruções */}
-        <div className="mb-8 bg-blue-50 border-l-4 border-map-primary rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">
+        <div className="mb-8 glass-card border-l-4 border-blue-500 p-6">
+          <h2 className="text-lg font-semibold text-white mb-2">
             📋 Instruções
           </h2>
-          <ul className="space-y-2 text-sm text-gray-700">
+          <ul className="space-y-2 text-sm text-blue-200">
             <li className="flex items-start gap-2">
-              <span className="text-map-primary font-bold">•</span>
-              <span>Leia cada afirmação com atenção e escolha um número de <strong>0 a 10</strong>.</span>
+              <span className="text-blue-400 font-bold">•</span>
+              <span>Leia cada afirmação com atenção e escolha um número de <strong className="text-white">0 a 10</strong>.</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-map-primary font-bold">•</span>
-              <span><strong>0 = NUNCA</strong> (discordo totalmente) | <strong>10 = SEMPRE</strong> (concordo totalmente)</span>
+              <span className="text-blue-400 font-bold">•</span>
+              <span><strong className="text-white">0 = NUNCA</strong> (discordo totalmente) | <strong className="text-white">10 = SEMPRE</strong> (concordo totalmente)</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-map-primary font-bold">•</span>
-              <span>Suas respostas são <strong>100% anônimas</strong>. Seja honesto(a)!</span>
+              <span className="text-blue-400 font-bold">•</span>
+              <span>Suas respostas são <strong className="text-white">100% anônimas</strong>. Seja honesto(a)!</span>
             </li>
           </ul>
         </div>
@@ -175,23 +177,23 @@ export default function FormularioPage() {
 
         {/* Mensagem de erro */}
         {error && (
-          <div className="mt-8 bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="mt-8 glass-card border-l-4 border-red-500 bg-red-500/10 p-4">
+            <p className="text-sm text-red-300">{error}</p>
           </div>
         )}
 
         {/* Botão de envio */}
-        <div className="mt-8 bg-white rounded-lg shadow-sm p-6">
+        <div className="mt-8 glass-card water-drop p-6">
           <button
             onClick={handleSubmit}
             disabled={!allAnswered || isSubmitting}
             className={`
-              w-full py-4 px-6 rounded-lg font-semibold text-lg
-              transition-all duration-200
+              w-full py-4 px-6 rounded-xl font-semibold text-lg
+              transition-all duration-300 glass-shine
               ${
                 allAnswered && !isSubmitting
-                  ? 'bg-map-primary hover:bg-map-primary/90 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-1'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-500/60 transform hover:scale-[1.02]'
+                  : 'bg-white/10 text-gray-400 cursor-not-allowed'
               }
             `}
           >
@@ -204,21 +206,21 @@ export default function FormularioPage() {
                 Enviando...
               </span>
             ) : allAnswered ? (
-              'Enviar Respostas'
+              '🚀 Enviar Respostas'
             ) : (
-              `Responda todas as perguntas (${answeredCount}/${QUESTIONS.length})`
+              `⏳ Responda todas as perguntas (${answeredCount}/${QUESTIONS.length})`
             )}
           </button>
 
           {allAnswered && !isSubmitting && (
-            <p className="text-center text-sm text-gray-600 mt-3">
+            <p className="text-center text-sm text-green-300 mt-3">
               ✅ Todas as perguntas foram respondidas. Clique para enviar!
             </p>
           )}
         </div>
 
         {/* Footer */}
-        <div className="mt-8 text-center text-sm text-gray-500">
+        <div className="mt-8 text-center text-sm text-blue-200">
           <p>🔒 Suas respostas são completamente anônimas e confidenciais.</p>
           <p className="mt-1">Desenvolvido por MAP © 2025</p>
         </div>
