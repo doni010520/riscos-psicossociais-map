@@ -4,6 +4,7 @@
 
 import asyncpg
 import os
+import ssl
 from typing import Optional
 from datetime import datetime
 
@@ -14,6 +15,11 @@ async def get_pool() -> asyncpg.Pool:
     """Retorna pool de conexões PostgreSQL"""
     global _pool
     if _pool is None:
+        # Configurar SSL (obrigatório no Supabase)
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
         # Usar variáveis separadas ao invés de URL
         _pool = await asyncpg.create_pool(
             host=os.getenv("DB_HOST"),
@@ -21,6 +27,7 @@ async def get_pool() -> asyncpg.Pool:
             database=os.getenv("DB_NAME"),
             user=os.getenv("DB_USER"),
             password=os.getenv("DB_PASSWORD"),
+            ssl=ssl_context,
             min_size=1,
             max_size=10,
             command_timeout=60
@@ -60,3 +67,14 @@ async def update_admin_last_login_direct(admin_id: str):
             datetime.utcnow(),
             admin_id
         )
+```
+
+---
+
+## ✅ TESTE 3: Tentar porta 5432 (Direct Connection)
+
+Pode ser que a porta 6543 (pooler) não aceite essa senha. Tenta com porta direta:
+
+**No Easypanel → Environment, muda:**
+```
+DB_PORT=5432
