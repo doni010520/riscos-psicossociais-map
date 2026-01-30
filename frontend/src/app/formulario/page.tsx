@@ -49,7 +49,7 @@ export default function FormularioPage() {
         demandas: [],
         controle: [],
         apoio_chefia: [],
-        relacionamentos: [],
+        relacionamento: [],
         papel: [],
         mudanca: [],
       };
