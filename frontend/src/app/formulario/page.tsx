@@ -44,7 +44,7 @@ export default function FormularioPage() {
     setError(null);
 
     try {
-      // Organizar respostas por dimensão - COM O TIPO CORRETO
+      // Organizar respostas por dimensão
       const dimensionAnswers: FormAnswers = {
         demandas: [],
         controle: [],
@@ -65,8 +65,12 @@ export default function FormularioPage() {
       // Calcular tempo de preenchimento
       const completionTime = Math.floor((Date.now() - startTime) / 1000);
 
-      // Enviar para API
-      await submitForm(dimensionAnswers, completionTime);
+      // Enviar para API - COM O FORMATO CORRETO
+      await submitForm({
+        answers: dimensionAnswers,
+        completionTimeSeconds: completionTime,
+        userAgent: navigator.userAgent
+      });
 
       // Log de conclusão
       await logAccess('form_completion');
