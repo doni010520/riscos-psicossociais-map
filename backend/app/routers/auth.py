@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.models import LoginRequest, TokenResponse, AdminUser
 from app.services.auth import verify_password, create_access_token, decode_access_token
-from app.services import supabase_service
+from app.services.postgres_direct import get_admin_by_email_direct, update_admin_last_login_direct
 from datetime import timedelta
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticação"])
@@ -19,13 +19,13 @@ security = HTTPBearer()
 @router.post("/login", response_model=TokenResponse)
 async def login(credentials: LoginRequest):
     """
-    Login admin
+    Login admin usando conexão direta ao PostgreSQL
     
     - **email**: Email do administrador
     - **password**: Senha
     """
-    # Buscar admin no banco
-    admin = await supabase_service.get_admin_by_email(credentials.email)
+    # Buscar admin no banco (conexão direta)
+    admin = await get_admin_by_email_direct(credentials.email)
     
     if not admin:
         raise HTTPException(
@@ -46,8 +46,8 @@ async def login(credentials: LoginRequest):
         expires_delta=timedelta(hours=24)
     )
     
-    # Atualizar último login
-    await supabase_service.update_admin_last_login(admin["id"])
+    # Atualizar último login (conexão direta)
+    await update_admin_last_login_direct(admin["id"])
     
     return TokenResponse(
         access_token=access_token,
@@ -81,8 +81,8 @@ async def get_current_admin(
             detail="Token inválido"
         )
     
-    # Buscar admin no banco para confirmar que ainda está ativo
-    admin = await supabase_service.get_admin_by_email(email)
+    # Buscar admin no banco (conexão direta)
+    admin = await get_admin_by_email_direct(email)
     
     if not admin or not admin["is_active"]:
         raise HTTPException(
