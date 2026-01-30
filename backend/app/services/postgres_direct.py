@@ -67,14 +67,3 @@ async def update_admin_last_login_direct(admin_id: str):
             datetime.utcnow(),
             admin_id
         )
-```
-
----
-
-## ✅ TESTE 3: Tentar porta 5432 (Direct Connection)
-
-Pode ser que a porta 6543 (pooler) não aceite essa senha. Tenta com porta direta:
-
-**No Easypanel → Environment, muda:**
-```
-DB_PORT=5432
