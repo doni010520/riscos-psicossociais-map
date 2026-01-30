@@ -44,8 +44,8 @@ export default function FormularioPage() {
     setError(null);
 
     try {
-      // Organizar respostas por dimensão
-      const dimensionAnswers: { [key: string]: number[] } = {
+      // Organizar respostas por dimensão - COM O TIPO CORRETO
+      const dimensionAnswers: FormAnswers = {
         demandas: [],
         controle: [],
         relacionamento: [],
@@ -66,7 +66,7 @@ export default function FormularioPage() {
       const completionTime = Math.floor((Date.now() - startTime) / 1000);
 
       // Enviar para API
-      await submitForm(dimensionAnswers as FormAnswers, completionTime);
+      await submitForm(dimensionAnswers, completionTime);
 
       // Log de conclusão
       await logAccess('form_completion');
