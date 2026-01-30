@@ -45,23 +45,20 @@ export default function FormularioPage() {
 
     try {
       // Organizar respostas por dimensão
-      const formAnswers: FormAnswers = {
+      const dimensionAnswers: { [key: string]: number[] } = {
         demandas: [],
         controle: [],
-        apoio_chefia: [],
         relacionamento: [],
-        papel: [],
+        cargo: [],
         mudanca: [],
+        apoio_chefia: [],
+        apoio_colegas: [],
       };
 
       QUESTIONS.forEach((question) => {
         const answer = answers[question.id];
         if (answer !== undefined) {
-          formAnswers[question.dimension].push({
-            question_id: question.id,
-            question_text: question.text,
-            score: answer,
-          });
+          dimensionAnswers[question.dimension].push(answer);
         }
       });
 
@@ -69,7 +66,7 @@ export default function FormularioPage() {
       const completionTime = Math.floor((Date.now() - startTime) / 1000);
 
       // Enviar para API
-      await submitForm(formAnswers, completionTime);
+      await submitForm(dimensionAnswers as FormAnswers, completionTime);
 
       // Log de conclusão
       await logAccess('form_completion');
