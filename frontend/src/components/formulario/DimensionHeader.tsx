@@ -6,7 +6,7 @@ import { DIMENSION_DESCRIPTIONS } from '@/lib/questions';
 
 export function DimensionHeader({ dimension, isExpanded, onToggle }: DimensionHeaderProps) {
   return (
-    <div className="glass-card glass-shine overflow-hidden">
+    <div className="glass-card overflow-hidden">
       <button
         onClick={onToggle}
         className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-white/10 transition-all"
