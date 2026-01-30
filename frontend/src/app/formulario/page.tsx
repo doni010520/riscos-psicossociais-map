@@ -65,7 +65,7 @@ export default function FormularioPage() {
       // Calcular tempo de preenchimento
       const completionTime = Math.floor((Date.now() - startTime) / 1000);
 
-      // Enviar para API - COM O FORMATO CORRETO
+      // Enviar para API
       await submitForm({
         answers: dimensionAnswers,
         completionTimeSeconds: completionTime,
@@ -87,8 +87,8 @@ export default function FormularioPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Header com glassmorphism */}
-      <header className="glass-card water-drop mb-8">
+      {/* Header - SEM water-drop */}
+      <header className="glass-card mb-8">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center gap-4">
             <Image
@@ -183,14 +183,14 @@ export default function FormularioPage() {
           </div>
         )}
 
-        {/* Botão de envio */}
-        <div className="mt-8 glass-card water-drop p-6">
+        {/* Botão de envio - SEM water-drop */}
+        <div className="mt-8 glass-card p-6">
           <button
             onClick={handleSubmit}
             disabled={!allAnswered || isSubmitting}
             className={`
               w-full py-4 px-6 rounded-xl font-semibold text-lg
-              transition-all duration-300 glass-shine
+              transition-all duration-300
               ${
                 allAnswered && !isSubmitting
                   ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-500/60 transform hover:scale-[1.02]'
