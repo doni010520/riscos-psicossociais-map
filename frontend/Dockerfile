@@ -4,7 +4,7 @@ FROM node:18-alpine AS base
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install --frozen-lockfile || npm install
+RUN npm install --legacy-peer-deps
 
 # Builder
 FROM base AS builder
