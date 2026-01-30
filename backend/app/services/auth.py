@@ -1,81 +1,34 @@
-# ============================================================================
-# AUTH ROUTER: Endpoints de autenticação admin
-# ============================================================================
+from datetime import datetime, timedelta
+from typing import Optional
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+import os
 
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.models import LoginRequest, TokenResponse, AdminUser
-from app.services.auth import verify_password, create_access_token, decode_access_token
-from app.services import supabase_service
-from datetime import timedelta
+SECRET_KEY = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
 
-router = APIRouter(prefix="/api/auth", tags=["Autenticação"])
-security = HTTPBearer()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-@router.post("/login", response_model=TokenResponse)
-async def login(credentials: LoginRequest):
-    """Login admin"""
-    admin = await supabase_service.get_admin_by_email(credentials.email)
-    
-    if not admin:
-        raise HTTPException(status_code=401, detail="Email ou senha incorretos")
-    
-    if not verify_password(credentials.password, admin["password_hash"]):
-        raise HTTPException(status_code=401, detail="Email ou senha incorretos")
-    
-    access_token = create_access_token(
-        data={"sub": admin["id"], "email": admin["email"]},
-        expires_delta=timedelta(hours=24)
-    )
-    
-    await supabase_service.update_admin_last_login(admin["id"])
-    
-    return TokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=86400
-    )
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
-async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
-    """Dependency para verificar autenticação"""
-    token = credentials.credentials
-    payload = decode_access_token(token)
-    
-    if not payload:
-        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
-    
-    admin_id = payload.get("sub")
-    email = payload.get("email")
-    
-    if not admin_id or not email:
-        raise HTTPException(status_code=401, detail="Token inválido")
-    
-    admin = await supabase_service.get_admin_by_email(email)
-    
-    if not admin or not admin["is_active"]:
-        raise HTTPException(status_code=401, detail="Usuário inativo ou não encontrado")
-    
-    return admin
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
 
-@router.get("/me", response_model=AdminUser)
-async def get_me(admin: dict = Depends(get_current_admin)):
-    """Retorna dados do admin autenticado"""
-    return AdminUser(
-        id=admin["id"],
-        email=admin["email"],
-        full_name=admin.get("full_name"),
-        created_at=admin["created_at"],
-        last_login=admin.get("last_login"),
-        is_active=admin["is_active"]
-    )
-```
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
----
-
-## 📦 ARQUIVO 3: requirements.txt (REMOVER asyncpg)
-
-**Caminho:** `backend/requirements.txt`
-
-**REMOVE a linha:**
-```
-asyncpg==0.29.0
+def decode_access_token(token: str) -> Optional[dict]:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None
