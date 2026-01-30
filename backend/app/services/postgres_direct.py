@@ -14,13 +14,13 @@ async def get_pool() -> asyncpg.Pool:
     """Retorna pool de conexões PostgreSQL"""
     global _pool
     if _pool is None:
-        # Connection string do Supabase
-        DATABASE_URL = os.getenv("DATABASE_URL")
-        if not DATABASE_URL:
-            raise ValueError("DATABASE_URL not configured")
-        
+        # Usar variáveis separadas ao invés de URL
         _pool = await asyncpg.create_pool(
-            DATABASE_URL,
+            host=os.getenv("DB_HOST"),
+            port=int(os.getenv("DB_PORT", "6543")),
+            database=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
             min_size=1,
             max_size=10,
             command_timeout=60
