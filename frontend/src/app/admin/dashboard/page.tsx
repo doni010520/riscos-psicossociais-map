@@ -5,21 +5,20 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 interface Stats {
-  total_submissions: number;
-  average_score: number;
-  low_risk_count: number;
-  medium_risk_count: number;
-  high_risk_count: number;
-  critical_risk_count: number;
-  submissions_today: number;
-  submissions_this_week: number;
-  submissions_this_month: number;
+  total_responses: number;
+  avg_completion_time: number;
+  unique_ips: number;
+  responses_last_24h: number;
+  responses_last_7d: number;
+  responses_last_30d: number;
 }
 
 interface RiskDist {
-  risk_level: string;
-  count: number;
-  percentage: number;
+  dimension: string;
+  baixo: number;
+  moderado: number;
+  alto: number;
+  critico: number;
 }
 
 export default function AdminDashboard() {
@@ -48,7 +47,7 @@ export default function AdminDashboard() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-      const statsRes = await fetch(`${apiUrl}/api/stats/overview`, {
+      const statsRes = await fetch(`${apiUrl}/api/admin/stats/overview`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       
@@ -57,7 +56,7 @@ export default function AdminDashboard() {
         setStats(statsData);
       }
 
-      const riskRes = await fetch(`${apiUrl}/api/stats/risk-distribution`, {
+      const riskRes = await fetch(`${apiUrl}/api/admin/stats/risk-distribution`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       
@@ -81,11 +80,26 @@ export default function AdminDashboard() {
   const handleExportCSV = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/export/csv`, {
+      const response = await fetch(`${apiUrl}/api/admin/reports/responses`, {
+        method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
-      const blob = await response.blob();
+      const data = await response.json();
+      
+      // Converter para CSV
+      const headers = ['id', 'answers', 'completion_time_seconds', 'ip_address', 'user_agent', 'submitted_at'];
+      const csvContent = [
+        headers.join(','),
+        ...data.map((row: any) => 
+          headers.map(h => {
+            const val = h === 'answers' ? JSON.stringify(row[h]) : row[h];
+            return `"${val}"`;
+          }).join(',')
+        )
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -101,7 +115,8 @@ export default function AdminDashboard() {
   const handleExportJSON = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/export/ai`, {
+      const response = await fetch(`${apiUrl}/api/admin/reports/responses`, {
+        method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -117,6 +132,17 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Erro ao exportar JSON:', error);
     }
+  };
+
+  // Mapear nomes das dimensões
+  const dimensionNames: { [key: string]: string } = {
+    'demandas': 'Demandas',
+    'controle': 'Controle',
+    'apoio_chefia': 'Apoio da Chefia',
+    'apoio_colegas': 'Apoio dos Colegas',
+    'relacionamento': 'Relacionamentos',
+    'cargo': 'Cargo',
+    'mudanca': 'Mudança'
   };
 
   if (isLoading) {
@@ -164,8 +190,8 @@ export default function AdminDashboard() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-blue-200 text-sm font-medium mb-2">Total de Respostas</p>
-                  <p className="text-white text-3xl font-bold">{stats.total_submissions}</p>
-                  <p className="text-blue-300 text-xs mt-1">{stats.submissions_this_month} este mês</p>
+                  <p className="text-white text-3xl font-bold">{stats.total_responses}</p>
+                  <p className="text-blue-300 text-xs mt-1">{stats.responses_last_30d} este mês</p>
                 </div>
                 <div className="text-4xl">📊</div>
               </div>
@@ -174,35 +200,31 @@ export default function AdminDashboard() {
             <div className="glass-card water-drop p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-blue-200 text-sm font-medium mb-2">Média Geral</p>
-                  <p className="text-white text-3xl font-bold">{stats.average_score.toFixed(1)}</p>
-                  <p className="text-blue-300 text-xs mt-1">Escala 0-10</p>
+                  <p className="text-blue-200 text-sm font-medium mb-2">Tempo Médio</p>
+                  <p className="text-white text-3xl font-bold">{Math.round(stats.avg_completion_time / 60)}min</p>
+                  <p className="text-blue-300 text-xs mt-1">{stats.avg_completion_time.toFixed(0)}s total</p>
                 </div>
-                <div className="text-4xl">📈</div>
+                <div className="text-4xl">⏱️</div>
               </div>
             </div>
 
             <div className="glass-card water-drop p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-blue-200 text-sm font-medium mb-2">Alto Risco</p>
-                  <p className="text-white text-3xl font-bold">{stats.high_risk_count + stats.critical_risk_count}</p>
-                  <p className="text-blue-300 text-xs mt-1">
-                    {stats.total_submissions > 0 
-                      ? ((stats.high_risk_count + stats.critical_risk_count) / stats.total_submissions * 100).toFixed(1) 
-                      : 0}% do total
-                  </p>
+                  <p className="text-blue-200 text-sm font-medium mb-2">IPs Únicos</p>
+                  <p className="text-white text-3xl font-bold">{stats.unique_ips}</p>
+                  <p className="text-blue-300 text-xs mt-1">Participantes distintos</p>
                 </div>
-                <div className="text-4xl">⚠️</div>
+                <div className="text-4xl">👥</div>
               </div>
             </div>
 
             <div className="glass-card water-drop p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-blue-200 text-sm font-medium mb-2">Respostas Hoje</p>
-                  <p className="text-white text-3xl font-bold">{stats.submissions_today}</p>
-                  <p className="text-blue-300 text-xs mt-1">{stats.submissions_this_week} esta semana</p>
+                  <p className="text-blue-200 text-sm font-medium mb-2">Últimas 24h</p>
+                  <p className="text-white text-3xl font-bold">{stats.responses_last_24h}</p>
+                  <p className="text-blue-300 text-xs mt-1">{stats.responses_last_7d} esta semana</p>
                 </div>
                 <div className="text-4xl">📅</div>
               </div>
@@ -210,31 +232,50 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Detalhamento de Riscos */}
+        {/* Detalhamento de Riscos por Dimensão */}
         <div className="glass-card water-drop mb-8 p-6">
           <h2 className="text-xl font-bold text-white mb-6">📋 Distribuição por Nível de Risco</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {riskDist.map((risk) => {
-              const bgColor = risk.risk_level === 'Baixo' ? 'bg-green-500/20 border-green-500/50' :
-                             risk.risk_level === 'Médio' ? 'bg-yellow-500/20 border-yellow-500/50' :
-                             risk.risk_level === 'Alto' ? 'bg-orange-500/20 border-orange-500/50' :
-                             'bg-red-500/20 border-red-500/50';
-              
-              const textColor = risk.risk_level === 'Baixo' ? 'text-green-300' :
-                               risk.risk_level === 'Médio' ? 'text-yellow-300' :
-                               risk.risk_level === 'Alto' ? 'text-orange-300' :
-                               'text-red-300';
-              
-              return (
-                <div key={risk.risk_level} className={`p-4 rounded-xl border ${bgColor}`}>
-                  <div className="text-center">
-                    <p className={`text-3xl font-bold mb-2 ${textColor}`}>{risk.count}</p>
-                    <p className={`text-sm font-medium mb-1 ${textColor}`}>{risk.risk_level}</p>
-                    <p className="text-xs opacity-80 text-blue-200">{risk.percentage.toFixed(1)}%</p>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/20">
+                  <th className="text-left text-blue-200 font-medium py-3 px-4">Dimensão</th>
+                  <th className="text-center text-green-300 font-medium py-3 px-4">Baixo</th>
+                  <th className="text-center text-yellow-300 font-medium py-3 px-4">Moderado</th>
+                  <th className="text-center text-orange-300 font-medium py-3 px-4">Alto</th>
+                  <th className="text-center text-red-300 font-medium py-3 px-4">Crítico</th>
+                </tr>
+              </thead>
+              <tbody>
+                {riskDist.map((risk) => (
+                  <tr key={risk.dimension} className="border-b border-white/10 hover:bg-white/5">
+                    <td className="text-white py-3 px-4 font-medium">
+                      {dimensionNames[risk.dimension] || risk.dimension}
+                    </td>
+                    <td className="text-center py-3 px-4">
+                      <span className="inline-block bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-sm">
+                        {risk.baixo}
+                      </span>
+                    </td>
+                    <td className="text-center py-3 px-4">
+                      <span className="inline-block bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded-full text-sm">
+                        {risk.moderado}
+                      </span>
+                    </td>
+                    <td className="text-center py-3 px-4">
+                      <span className="inline-block bg-orange-500/20 text-orange-300 px-3 py-1 rounded-full text-sm">
+                        {risk.alto}
+                      </span>
+                    </td>
+                    <td className="text-center py-3 px-4">
+                      <span className="inline-block bg-red-500/20 text-red-300 px-3 py-1 rounded-full text-sm">
+                        {risk.critico}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
