@@ -22,7 +22,7 @@ async def make_request(endpoint: str, method: str = "POST", data: dict = None) -
 # ============================================================================
 
 async def login_admin(email: str, password: str) -> dict:
-    """Login via N8N (verifica senha com PostgreSQL crypt)"""
+    """Login via N8N (verifica senha com PostgreSQL)"""
     data = {
         "email": email,
         "password": password
@@ -94,6 +94,11 @@ async def get_overview_stats() -> dict:
 async def get_risk_distribution() -> List[dict]:
     """Retorna distribuição de risco por dimensão"""
     result = await make_request("stats-risk-distribution", "GET")
+    return result
+
+async def get_dimension_summary() -> List[dict]:
+    """Retorna resumo de pontuação por dimensão"""
+    result = await make_request("stats-dimension-summary", "GET")
     return result
 
 async def get_submissions_timeline(
