@@ -1,157 +1,60 @@
-import httpx
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+from fastapi import APIRouter, HTTPException
+from app.services import supabase_service
+from typing import List
 
-N8N_BASE_URL = "https://benitech-n8n.x3t6qy.easypanel.host/webhook"
+router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
-async def make_request(endpoint: str, method: str = "POST", data: dict = None) -> Any:
-    """Faz requisição para webhook N8N"""
-    url = f"{N8N_BASE_URL}/{endpoint}"
-    
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        if method == "GET":
-            response = await client.get(url)
-        else:
-            response = await client.post(url, json=data or {})
-        
-        response.raise_for_status()
-        return response.json()
-
-# ============================================================================
-# AUTH
-# ============================================================================
-
-async def login_admin(email: str, password: str) -> dict:
-    """Login via N8N (verifica senha com PostgreSQL)"""
-    data = {
-        "email": email,
-        "password": password
-    }
-    
-    result = await make_request("admin-login", "POST", data)
-    return result
-
-async def get_admin_by_email(email: str) -> Optional[dict]:
-    """Busca admin por email"""
-    try:
-        result = await make_request("admin-get", "POST", {"email": email})
-        return result
-    except:
-        return None
-
-async def update_admin_last_login(admin_id: str):
-    """Atualiza último login do admin"""
-    await make_request("admin-update-login", "POST", {"admin_id": admin_id})
-
-# ============================================================================
-# FORM
-# ============================================================================
-
-async def insert_response(
-    ip_address: str,
-    answers: dict,
-    completion_time_seconds: int,
-    user_agent: Optional[str] = None
-) -> dict:
-    """Insere uma nova resposta no banco"""
-    data = {
-        "ip_address": ip_address,
-        "answers": answers,
-        "completion_time_seconds": completion_time_seconds,
-        "user_agent": user_agent
-    }
-    
-    result = await make_request("form-submit", "POST", data)
-    return result
-
-# ============================================================================
-# ACCESS LOG
-# ============================================================================
-
-async def log_access(
-    ip_address: str,
-    action: str,
-    metadata: Optional[dict] = None
-):
-    """Registra acesso no log"""
-    data = {
-        "ip_address": ip_address,
-        "action": action,
-        "metadata": metadata
-    }
-    
-    await make_request("log-access", "POST", data)
-
-# ============================================================================
-# STATS
-# ============================================================================
-
-async def get_overview_stats() -> dict:
+@router.get("/stats/overview")
+async def get_overview():
     """Retorna estatísticas gerais"""
-    result = await make_request("stats-overview", "GET")
-    return result
+    stats = await supabase_service.get_overview_stats()
+    if not stats:
+        raise HTTPException(status_code=404, detail="Nenhuma estatística encontrada")
+    return stats
 
-async def get_risk_distribution() -> List[dict]:
+@router.get("/stats/risk-distribution")
+async def get_risk_distribution():
     """Retorna distribuição de risco por dimensão"""
-    result = await make_request("stats-risk-distribution", "GET")
-    return result
+    distribution = await supabase_service.get_risk_distribution()
+    return distribution
 
-async def get_dimension_summary() -> List[dict]:
+@router.get("/stats/dimension-summary")
+async def get_dimension_summary():
     """Retorna resumo de pontuação por dimensão"""
-    result = await make_request("stats-dimension-summary", "GET")
-    return result
+    summary = await supabase_service.get_dimension_summary()
+    return summary
 
-async def get_submissions_timeline(
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None
-) -> List[dict]:
+@router.get("/stats/timeline")
+async def get_timeline(start_date: str = None, end_date: str = None):
     """Retorna timeline de submissões"""
-    data = {
-        "start_date": start_date.isoformat() if start_date else None,
-        "end_date": end_date.isoformat() if end_date else None
-    }
-    
-    result = await make_request("stats-timeline", "POST", data)
-    return result
+    from datetime import datetime
+    start = datetime.fromisoformat(start_date) if start_date else None
+    end = datetime.fromisoformat(end_date) if end_date else None
+    timeline = await supabase_service.get_submissions_timeline(start, end)
+    return timeline
 
-# ============================================================================
-# REPORTS
-# ============================================================================
-
-async def get_responses_by_filters(
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
-    risk_level: Optional[str] = None,
-    dimension: Optional[str] = None,
+@router.get("/reports/responses")
+async def get_filtered_responses(
+    start_date: str = None, 
+    end_date: str = None, 
+    risk_level: str = None, 
+    dimension: str = None, 
     limit: int = 100
-) -> List[dict]:
+):
     """Retorna respostas filtradas"""
-    data = {
-        "start_date": start_date.isoformat() if start_date else None,
-        "end_date": end_date.isoformat() if end_date else None,
-        "risk_level": risk_level,
-        "dimension": dimension,
-        "limit": limit
-    }
-    
-    result = await make_request("reports-filtered", "POST", data)
-    return result
+    from datetime import datetime
+    start = datetime.fromisoformat(start_date) if start_date else None
+    end = datetime.fromisoformat(end_date) if end_date else None
+    responses = await supabase_service.get_responses_by_filters(
+        start_date=start, 
+        end_date=end, 
+        risk_level=risk_level, 
+        dimension=dimension, 
+        limit=limit
+    )
+    return responses
 
-async def export_for_ai(
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None
-) -> List[dict]:
-    """Exporta dados para análise por IA"""
-    data = {
-        "start_date": start_date.isoformat() if start_date else None,
-        "end_date": end_date.isoformat() if end_date else None
-    }
-    
-    result = await make_request("reports-export-ai", "POST", data)
-    return result
-
-async def get_dimension_detailed_analysis(dimension: str) -> dict:
-    """Análise detalhada de uma dimensão específica"""
-    data = {"dimension": dimension}
-    result = await make_request("reports-dimension", "POST", data)
-    return result
+@router.get("/health")
+async def admin_health():
+    """Health check do endpoint admin"""
+    return {"status": "healthy", "service": "admin"}
