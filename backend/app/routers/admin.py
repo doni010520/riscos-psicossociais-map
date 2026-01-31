@@ -1,25 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from app.models import OverviewStats, RiskDistribution, SubmissionTimeline
 from app.services import supabase_service
-from app.routers.auth import get_current_admin
 from typing import List
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
 @router.get("/stats/overview", response_model=OverviewStats)
-async def get_overview(admin: dict = Depends(get_current_admin)):
+async def get_overview():
     stats = await supabase_service.get_overview_stats()
     if not stats:
         raise HTTPException(status_code=404, detail="Nenhuma estatística encontrada")
     return stats
 
 @router.get("/stats/risk-distribution", response_model=List[RiskDistribution])
-async def get_risk_distribution(admin: dict = Depends(get_current_admin)):
+async def get_risk_distribution():
     distribution = await supabase_service.get_risk_distribution()
     return distribution
 
 @router.get("/stats/timeline", response_model=List[SubmissionTimeline])
-async def get_timeline(start_date: str = None, end_date: str = None, admin: dict = Depends(get_current_admin)):
+async def get_timeline(start_date: str = None, end_date: str = None):
     from datetime import datetime
     start = datetime.fromisoformat(start_date) if start_date else None
     end = datetime.fromisoformat(end_date) if end_date else None
@@ -27,7 +26,7 @@ async def get_timeline(start_date: str = None, end_date: str = None, admin: dict
     return timeline
 
 @router.get("/reports/responses")
-async def get_filtered_responses(start_date: str = None, end_date: str = None, risk_level: str = None, dimension: str = None, limit: int = 100, admin: dict = Depends(get_current_admin)):
+async def get_filtered_responses(start_date: str = None, end_date: str = None, risk_level: str = None, dimension: str = None, limit: int = 100):
     from datetime import datetime
     start = datetime.fromisoformat(start_date) if start_date else None
     end = datetime.fromisoformat(end_date) if end_date else None
@@ -35,5 +34,5 @@ async def get_filtered_responses(start_date: str = None, end_date: str = None, r
     return responses
 
 @router.get("/health")
-async def admin_health(admin: dict = Depends(get_current_admin)):
-    return {"status": "healthy", "service": "admin", "admin_email": admin["email"]}
+async def admin_health():
+    return {"status": "healthy", "service": "admin"}
