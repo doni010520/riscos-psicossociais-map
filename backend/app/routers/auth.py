@@ -9,7 +9,6 @@ security = HTTPBearer()
 
 @router.post("/login", response_model=TokenResponse)
 async def login(credentials: LoginRequest):
-    """Login completo via N8N (verifica senha e gera token)"""
     try:
         result = await n8n_service.login_admin(credentials.email, credentials.password)
         return TokenResponse(
@@ -21,7 +20,6 @@ async def login(credentials: LoginRequest):
         raise HTTPException(status_code=401, detail="Email ou senha incorretos")
 
 async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
-    """Valida token JWT e retorna dados do admin"""
     token = credentials.credentials
     payload = decode_access_token(token)
     
@@ -34,15 +32,10 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
     if not admin_id or not email:
         raise HTTPException(status_code=401, detail="Token inválido")
     
-    return {
-        "id": admin_id,
-        "email": email,
-        "is_active": True
-    }
+    return {"id": admin_id, "email": email, "is_active": True}
 
 @router.get("/me", response_model=AdminUser)
 async def get_me(admin: dict = Depends(get_current_admin)):
-    """Retorna dados do admin logado"""
     return AdminUser(
         id=admin["id"],
         email=admin["email"],
