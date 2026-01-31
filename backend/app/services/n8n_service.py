@@ -1,5 +1,4 @@
 import httpx
-import os
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -22,11 +21,15 @@ async def make_request(endpoint: str, method: str = "POST", data: dict = None) -
 # AUTH
 # ============================================================================
 
-async def get_admin_by_email(email: str) -> Optional[dict]:
-    """Busca admin por email"""
+async def get_admin_by_email(email: str, password: str = None) -> Optional[dict]:
+    """Login completo no N8N (busca admin + verifica senha + gera token)"""
     try:
-        result = await make_request("admin-login", "POST", {"email": email})
-        return result if result else None
+        data = {"email": email}
+        if password:
+            data["password"] = password
+        
+        result = await make_request("admin-login", "POST", data)
+        return result
     except:
         return None
 
