@@ -4,17 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
+  Tooltip,
+  ResponsiveContainer,
 } from 'recharts';
 
 interface Stats {
@@ -93,7 +87,6 @@ export default function AdminDashboard() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-      // Stats Overview
       const statsRes = await fetch(`${apiUrl}/api/admin/stats/overview`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -102,7 +95,6 @@ export default function AdminDashboard() {
         setStats(statsData);
       }
 
-      // Risk Distribution
       const riskRes = await fetch(`${apiUrl}/api/admin/stats/risk-distribution`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -111,7 +103,6 @@ export default function AdminDashboard() {
         setRiskDist(riskData);
       }
 
-      // Dimension Summary (NOVO!)
       const summaryRes = await fetch(`${apiUrl}/api/admin/stats/dimension-summary`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -188,7 +179,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Dados para gráfico de pizza
   const totalRisks = riskDist.reduce(
     (acc, item) => ({
       baixo: acc.baixo + item.baixo,
@@ -293,86 +283,56 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* NOVO: Resumo por Dimensão - Estilo Termômetro */}
+        {/* Resultado por Dimensão - Tabela Simples */}
         <div className="glass-card water-drop mb-8 p-6">
           <h2 className="text-xl font-bold text-white mb-6">🎯 Resultado por Dimensão</h2>
-          <p className="text-blue-200 text-sm mb-6">Pontuação média dos respondentes por área avaliada</p>
           
-          <div className="space-y-4">
-            {dimensionSummary.map((item) => {
-              const percentage = parseFloat(item.percentage);
-              const avgPoints = parseFloat(item.avg_points);
-              
-              return (
-                <div key={item.dimension} className="bg-white/5 rounded-xl p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-white font-medium">
-                      {dimensionNames[item.dimension] || item.dimension}
-                    </span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-blue-200 text-sm">
-                        {avgPoints.toFixed(1)} / {item.max_points} pts
-                      </span>
-                      <span 
-                        className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          item.risk_level === 'baixo' ? 'bg-green-500/30 text-green-300' :
-                          item.risk_level === 'moderado' ? 'bg-yellow-500/30 text-yellow-300' :
-                          item.risk_level === 'alto' ? 'bg-orange-500/30 text-orange-300' :
-                          'bg-red-500/30 text-red-300'
-                        }`}
-                      >
-                        {riskLabels[item.risk_level]} ({percentage.toFixed(0)}%)
-                      </span>
-                    </div>
-                  </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/20">
+                  <th className="text-left text-blue-200 font-medium py-3 px-4">Dimensão</th>
+                  <th className="text-center text-blue-200 font-medium py-3 px-4">Máximo</th>
+                  <th className="text-center text-blue-200 font-medium py-3 px-4">Resultado</th>
+                  <th className="text-center text-blue-200 font-medium py-3 px-4">%</th>
+                  <th className="text-center text-blue-200 font-medium py-3 px-4">Nível</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dimensionSummary.map((item) => {
+                  const percentage = parseFloat(item.percentage);
+                  const avgPoints = parseFloat(item.avg_points);
                   
-                  {/* Barra de Progresso com Faixas de Cor */}
-                  <div className="relative h-6 rounded-full overflow-hidden bg-gray-700">
-                    {/* Faixas de fundo */}
-                    <div className="absolute inset-0 flex">
-                      <div className="w-[29%] bg-green-500/30"></div>
-                      <div className="w-[20%] bg-yellow-500/30"></div>
-                      <div className="w-[40%] bg-orange-500/30"></div>
-                      <div className="w-[11%] bg-red-500/30"></div>
-                    </div>
-                    
-                    {/* Indicador de posição */}
-                    <div 
-                      className="absolute top-0 bottom-0 w-1 bg-white shadow-lg"
-                      style={{ left: `${Math.min(percentage, 100)}%` }}
-                    ></div>
-                    
-                    {/* Labels das faixas */}
-                    <div className="absolute inset-0 flex text-[10px] font-medium">
-                      <div className="w-[29%] flex items-center justify-center text-green-200">0-29%</div>
-                      <div className="w-[20%] flex items-center justify-center text-yellow-200">30-49%</div>
-                      <div className="w-[40%] flex items-center justify-center text-orange-200">50-89%</div>
-                      <div className="w-[11%] flex items-center justify-center text-red-200">90%+</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          
-          {/* Legenda */}
-          <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t border-white/10">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-green-500"></div>
-              <span className="text-sm text-blue-200">Baixo (0-29%)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-yellow-500"></div>
-              <span className="text-sm text-blue-200">Moderado (30-49%)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-orange-500"></div>
-              <span className="text-sm text-blue-200">Alto (50-89%)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-red-500"></div>
-              <span className="text-sm text-blue-200">Crítico (90-100%)</span>
-            </div>
+                  const rowBg = 
+                    item.risk_level === 'baixo' ? 'bg-green-500/40' :
+                    item.risk_level === 'moderado' ? 'bg-yellow-500/40' :
+                    item.risk_level === 'alto' ? 'bg-orange-500/40' :
+                    'bg-red-500/40';
+                  
+                  return (
+                    <tr key={item.dimension} className={`${rowBg} border-b border-white/10`}>
+                      <td className="text-white py-3 px-4 font-medium">
+                        {dimensionNames[item.dimension] || item.dimension}
+                      </td>
+                      <td className="text-center text-white py-3 px-4">
+                        {item.max_points} pts
+                      </td>
+                      <td className="text-center text-white py-3 px-4 font-bold">
+                        {avgPoints.toFixed(1)} pts
+                      </td>
+                      <td className="text-center text-white py-3 px-4 font-bold">
+                        {percentage.toFixed(0)}%
+                      </td>
+                      <td className="text-center py-3 px-4">
+                        <span className="text-white font-bold">
+                          {riskLabels[item.risk_level]}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -414,7 +374,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Resumo Rápido */}
+          {/* Áreas que Precisam de Atenção */}
           <div className="glass-card water-drop p-6">
             <h2 className="text-xl font-bold text-white mb-4">⚠️ Áreas que Precisam de Atenção</h2>
             <div className="space-y-3">
@@ -452,7 +412,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Ações de Exportação */}
+        {/* Exportar Dados */}
         <div className="glass-card water-drop p-6 mb-8">
           <h2 className="text-xl font-bold text-white mb-6">⚡ Exportar Dados</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
