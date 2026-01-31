@@ -18,11 +18,11 @@ async def make_request(endpoint: str, method: str = "POST", data: dict = None) -
         return response.json()
 
 # ============================================================================
-# AUTH - N8N FAZ TUDO (verifica senha + gera token)
+# AUTH
 # ============================================================================
 
 async def login_admin(email: str, password: str) -> dict:
-    """Login completo no N8N (verifica senha + gera token)"""
+    """Login via N8N (verifica senha com PostgreSQL crypt)"""
     data = {
         "email": email,
         "password": password
@@ -32,7 +32,7 @@ async def login_admin(email: str, password: str) -> dict:
     return result
 
 async def get_admin_by_email(email: str) -> Optional[dict]:
-    """Busca admin por email (usado apenas para validação de token)"""
+    """Busca admin por email"""
     try:
         result = await make_request("admin-get", "POST", {"email": email})
         return result
