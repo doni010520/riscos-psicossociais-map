@@ -3,6 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 
 interface Stats {
   total_responses: number;
@@ -20,6 +33,23 @@ interface RiskDist {
   alto: number;
   critico: number;
 }
+
+const COLORS = {
+  baixo: '#22c55e',
+  moderado: '#eab308',
+  alto: '#f97316',
+  critico: '#ef4444',
+};
+
+const dimensionNames: { [key: string]: string } = {
+  'demandas': 'Demandas',
+  'controle': 'Controle',
+  'apoio_chefia': 'Apoio Chefia',
+  'apoio_colegas': 'Apoio Colegas',
+  'relacionamento': 'Relacionamentos',
+  'cargo': 'Cargo',
+  'mudanca': 'Mudança'
+};
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -87,7 +117,6 @@ export default function AdminDashboard() {
 
       const data = await response.json();
       
-      // Converter para CSV
       const headers = ['id', 'answers', 'completion_time_seconds', 'ip_address', 'user_agent', 'submitted_at'];
       const csvContent = [
         headers.join(','),
@@ -134,16 +163,34 @@ export default function AdminDashboard() {
     }
   };
 
-  // Mapear nomes das dimensões
-  const dimensionNames: { [key: string]: string } = {
-    'demandas': 'Demandas',
-    'controle': 'Controle',
-    'apoio_chefia': 'Apoio da Chefia',
-    'apoio_colegas': 'Apoio dos Colegas',
-    'relacionamento': 'Relacionamentos',
-    'cargo': 'Cargo',
-    'mudanca': 'Mudança'
-  };
+  // Preparar dados para o gráfico de barras
+  const chartData = riskDist.map(item => ({
+    name: dimensionNames[item.dimension] || item.dimension,
+    Baixo: item.baixo,
+    Moderado: item.moderado,
+    Alto: item.alto,
+    Crítico: item.critico,
+  }));
+
+  // Preparar dados para o gráfico de pizza (totais gerais)
+  const totalRisks = riskDist.reduce(
+    (acc, item) => ({
+      baixo: acc.baixo + item.baixo,
+      moderado: acc.moderado + item.moderado,
+      alto: acc.alto + item.alto,
+      critico: acc.critico + item.critico,
+    }),
+    { baixo: 0, moderado: 0, alto: 0, critico: 0 }
+  );
+
+  const pieData = [
+    { name: 'Baixo', value: totalRisks.baixo, color: COLORS.baixo },
+    { name: 'Moderado', value: totalRisks.moderado, color: COLORS.moderado },
+    { name: 'Alto', value: totalRisks.alto, color: COLORS.alto },
+    { name: 'Crítico', value: totalRisks.critico, color: COLORS.critico },
+  ];
+
+  const totalGeral = totalRisks.baixo + totalRisks.moderado + totalRisks.alto + totalRisks.critico;
 
   if (isLoading) {
     return (
@@ -232,48 +279,117 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Detalhamento de Riscos por Dimensão */}
+        {/* Gráficos */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Gráfico de Pizza - Visão Geral */}
+          <div className="glass-card water-drop p-6">
+            <h2 className="text-xl font-bold text-white mb-4">🎯 Visão Geral de Riscos</h2>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
+                  labelStyle={{ color: '#fff' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              {pieData.map((item) => (
+                <div key={item.name} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                  <span className="text-sm text-blue-200">{item.name}: {item.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Gráfico de Barras - Por Dimensão */}
+          <div className="glass-card water-drop p-6 lg:col-span-2">
+            <h2 className="text-xl font-bold text-white mb-4">📊 Distribuição por Dimensão</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis type="number" stroke="#9ca3af" />
+                <YAxis dataKey="name" type="category" stroke="#9ca3af" width={100} tick={{ fontSize: 12 }} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
+                  labelStyle={{ color: '#fff' }}
+                />
+                <Legend />
+                <Bar dataKey="Baixo" stackId="a" fill={COLORS.baixo} />
+                <Bar dataKey="Moderado" stackId="a" fill={COLORS.moderado} />
+                <Bar dataKey="Alto" stackId="a" fill={COLORS.alto} />
+                <Bar dataKey="Crítico" stackId="a" fill={COLORS.critico} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Tabela Detalhada */}
         <div className="glass-card water-drop mb-8 p-6">
-          <h2 className="text-xl font-bold text-white mb-6">📋 Distribuição por Nível de Risco</h2>
+          <h2 className="text-xl font-bold text-white mb-6">📋 Detalhamento por Dimensão</h2>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/20">
                   <th className="text-left text-blue-200 font-medium py-3 px-4">Dimensão</th>
-                  <th className="text-center text-green-300 font-medium py-3 px-4">Baixo</th>
-                  <th className="text-center text-yellow-300 font-medium py-3 px-4">Moderado</th>
-                  <th className="text-center text-orange-300 font-medium py-3 px-4">Alto</th>
-                  <th className="text-center text-red-300 font-medium py-3 px-4">Crítico</th>
+                  <th className="text-center text-green-300 font-medium py-3 px-4">Baixo (0-29%)</th>
+                  <th className="text-center text-yellow-300 font-medium py-3 px-4">Moderado (30-49%)</th>
+                  <th className="text-center text-orange-300 font-medium py-3 px-4">Alto (50-89%)</th>
+                  <th className="text-center text-red-300 font-medium py-3 px-4">Crítico (90-100%)</th>
+                  <th className="text-center text-blue-200 font-medium py-3 px-4">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {riskDist.map((risk) => (
-                  <tr key={risk.dimension} className="border-b border-white/10 hover:bg-white/5">
-                    <td className="text-white py-3 px-4 font-medium">
-                      {dimensionNames[risk.dimension] || risk.dimension}
-                    </td>
-                    <td className="text-center py-3 px-4">
-                      <span className="inline-block bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-sm">
-                        {risk.baixo}
-                      </span>
-                    </td>
-                    <td className="text-center py-3 px-4">
-                      <span className="inline-block bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded-full text-sm">
-                        {risk.moderado}
-                      </span>
-                    </td>
-                    <td className="text-center py-3 px-4">
-                      <span className="inline-block bg-orange-500/20 text-orange-300 px-3 py-1 rounded-full text-sm">
-                        {risk.alto}
-                      </span>
-                    </td>
-                    <td className="text-center py-3 px-4">
-                      <span className="inline-block bg-red-500/20 text-red-300 px-3 py-1 rounded-full text-sm">
-                        {risk.critico}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {riskDist.map((risk) => {
+                  const total = risk.baixo + risk.moderado + risk.alto + risk.critico;
+                  return (
+                    <tr key={risk.dimension} className="border-b border-white/10 hover:bg-white/5">
+                      <td className="text-white py-3 px-4 font-medium">
+                        {dimensionNames[risk.dimension] || risk.dimension}
+                      </td>
+                      <td className="text-center py-3 px-4">
+                        <span className="inline-block bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-sm min-w-[40px]">
+                          {risk.baixo}
+                        </span>
+                      </td>
+                      <td className="text-center py-3 px-4">
+                        <span className="inline-block bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded-full text-sm min-w-[40px]">
+                          {risk.moderado}
+                        </span>
+                      </td>
+                      <td className="text-center py-3 px-4">
+                        <span className="inline-block bg-orange-500/20 text-orange-300 px-3 py-1 rounded-full text-sm min-w-[40px]">
+                          {risk.alto}
+                        </span>
+                      </td>
+                      <td className="text-center py-3 px-4">
+                        <span className="inline-block bg-red-500/20 text-red-300 px-3 py-1 rounded-full text-sm min-w-[40px]">
+                          {risk.critico}
+                        </span>
+                      </td>
+                      <td className="text-center py-3 px-4">
+                        <span className="inline-block bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-sm min-w-[40px]">
+                          {total}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
