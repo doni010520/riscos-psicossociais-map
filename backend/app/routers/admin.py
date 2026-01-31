@@ -13,8 +13,66 @@ from app.routers.auth import get_current_admin
 from typing import List
 import json
 import io
+import os
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
+
+# ============================================================================
+# DIAGNÓSTICO (SEM AUTENTICAÇÃO)
+# ============================================================================
+
+@router.get("/diagnostics")
+async def diagnostics():
+    """Endpoint de diagnóstico - testa conexão Supabase"""
+    from supabase import create_client
+    
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    
+    result = {
+        "env_check": {
+            "url_exists": bool(url),
+            "key_exists": bool(key),
+            "url": url
+        },
+        "tests": {}
+    }
+    
+    try:
+        client = create_client(url, key)
+        result["tests"]["client_created"] = True
+        
+        # Teste responses
+        try:
+            test_responses = client.table("responses").select("id").limit(1).execute()
+            result["tests"]["responses"] = {
+                "success": True,
+                "count": len(test_responses.data) if test_responses.data else 0
+            }
+        except Exception as e:
+            result["tests"]["responses"] = {
+                "success": False,
+                "error": str(e)
+            }
+        
+        # Teste admin_users
+        try:
+            test_admin = client.table("admin_users").select("id").limit(1).execute()
+            result["tests"]["admin_users"] = {
+                "success": True,
+                "count": len(test_admin.data) if test_admin.data else 0
+            }
+        except Exception as e:
+            result["tests"]["admin_users"] = {
+                "success": False,
+                "error": str(e)
+            }
+            
+    except Exception as e:
+        result["tests"]["client_created"] = False
+        result["tests"]["error"] = str(e)
+    
+    return result
 
 # ============================================================================
 # OVERVIEW / DASHBOARD
@@ -30,68 +88,89 @@ async def get_overview(admin: dict = Depends(get_current_admin)):
     stats = await supabase_service.get_overview_stats()
     
     if not stats:
-        raise HTTPException(
-            status_code=404,
-            detail="Nenhuma resposta encontrada"
-        )
+        raise HTTPException(status_code=404, detail="Nenhuma estatística encontrada")
     
     return stats
+
+# ============================================================================
+# RISK DISTRIBUTION
+# ============================================================================
 
 @router.get("/stats/risk-distribution", response_model=List[RiskDistribution])
 async def get_risk_distribution(admin: dict = Depends(get_current_admin)):
     """
     Distribuição de risco por dimensão
     
-    Retorna contagem de respostas em cada nível de risco para cada dimensão.
+    Retorna contagem de respostas em cada nível de risco (baixo, moderado, alto, crítico)
+    para cada dimensão avaliada.
     """
     distribution = await supabase_service.get_risk_distribution()
     return distribution
 
+# ============================================================================
+# SUBMISSIONS TIMELINE
+# ============================================================================
+
 @router.get("/stats/timeline", response_model=List[SubmissionTimeline])
 async def get_timeline(
-    filters: ReportFilters = Depends(),
+    start_date: str = None,
+    end_date: str = None,
     admin: dict = Depends(get_current_admin)
 ):
     """
-    Timeline de submissões (por hora)
+    Timeline de submissões
     
-    Mostra quando as respostas foram enviadas ao longo do tempo.
+    Retorna série temporal com número de submissões e IPs únicos por hora.
+    Opcionalmente filtra por período.
     """
-    timeline = await supabase_service.get_submissions_timeline(
-        start_date=filters.start_date,
-        end_date=filters.end_date
-    )
+    from datetime import datetime
+    
+    start = datetime.fromisoformat(start_date) if start_date else None
+    end = datetime.fromisoformat(end_date) if end_date else None
+    
+    timeline = await supabase_service.get_submissions_timeline(start, end)
     return timeline
 
 # ============================================================================
 # DETAILED REPORTS
 # ============================================================================
 
-@router.post("/reports/filtered")
+@router.get("/reports/responses")
 async def get_filtered_responses(
-    filters: ReportFilters,
+    start_date: str = None,
+    end_date: str = None,
+    risk_level: str = None,
+    dimension: str = None,
+    limit: int = 100,
     admin: dict = Depends(get_current_admin)
 ):
     """
-    Respostas filtradas por parâmetros
+    Respostas filtradas
     
-    - **start_date**: Data inicial (opcional)
-    - **end_date**: Data final (opcional)
-    - **risk_level**: Nível de risco (BAIXO, MODERADO, ALTO, CRITICO)
-    - **dimension**: Dimensão específica
+    Retorna lista de respostas individuais com filtros opcionais:
+    - start_date / end_date: período (ISO format)
+    - risk_level: baixo, moderado, alto, critico
+    - dimension: demandas, controle, relacionamento, cargo, mudanca, apoio_chefia, apoio_colegas
+    - limit: número máximo de resultados (padrão: 100)
     """
+    from datetime import datetime
+    
+    start = datetime.fromisoformat(start_date) if start_date else None
+    end = datetime.fromisoformat(end_date) if end_date else None
+    
     responses = await supabase_service.get_responses_by_filters(
-        start_date=filters.start_date,
-        end_date=filters.end_date,
-        risk_level=filters.risk_level,
-        dimension=filters.dimension
+        start_date=start,
+        end_date=end,
+        risk_level=risk_level,
+        dimension=dimension,
+        limit=limit
     )
     
-    return {
-        "total": len(responses),
-        "filters": filters.dict(),
-        "data": responses
-    }
+    return responses
+
+# ============================================================================
+# DIMENSION ANALYSIS
+# ============================================================================
 
 @router.get("/reports/dimension/{dimension}")
 async def get_dimension_analysis(
@@ -99,9 +178,12 @@ async def get_dimension_analysis(
     admin: dict = Depends(get_current_admin)
 ):
     """
-    Análise detalhada de uma dimensão específica
+    Análise detalhada de uma dimensão
     
-    - **dimension**: demandas, controle, relacionamento, cargo, mudanca, apoio_chefia, apoio_colegas
+    Retorna estatísticas completas sobre uma dimensão específica:
+    - Média, desvio padrão, mínimo, máximo, mediana
+    - Distribuição por nível de risco
+    - Percentis
     """
     valid_dimensions = [
         "demandas", "controle", "relacionamento", "cargo",
@@ -111,97 +193,112 @@ async def get_dimension_analysis(
     if dimension not in valid_dimensions:
         raise HTTPException(
             status_code=400,
-            detail=f"Dimensão inválida. Use uma de: {', '.join(valid_dimensions)}"
+            detail=f"Dimensão inválida. Use: {', '.join(valid_dimensions)}"
         )
     
     analysis = await supabase_service.get_dimension_detailed_analysis(dimension)
     return analysis
 
 # ============================================================================
-# EXPORT (for AI Analysis)
+# EXPORT FOR AI ANALYSIS
 # ============================================================================
 
-@router.post("/export/ai", response_model=ExportResponse)
-async def export_for_ai(
-    filters: ReportFilters,
+@router.get("/export/ai", response_model=ExportResponse)
+async def export_for_ai_analysis(
+    start_date: str = None,
+    end_date: str = None,
     admin: dict = Depends(get_current_admin)
 ):
     """
-    Exporta dados para análise por IA externa
+    Exporta dados estruturados para análise por IA
     
-    Retorna respostas estruturadas com pontuações e níveis de risco.
-    Ideal para análise por modelos de IA/ML.
+    Retorna todas as respostas com:
+    - Respostas originais
+    - Scores calculados
+    - Níveis de risco
+    - Metadados
+    
+    Formato otimizado para ser processado por LLMs.
     """
-    data = await supabase_service.export_for_ai(
-        start_date=filters.start_date,
-        end_date=filters.end_date
-    )
+    from datetime import datetime
+    
+    start = datetime.fromisoformat(start_date) if start_date else None
+    end = datetime.fromisoformat(end_date) if end_date else None
+    
+    data = await supabase_service.export_for_ai(start, end)
     
     return ExportResponse(
         total_responses=len(data),
         data=data
     )
 
-@router.post("/export/csv")
+# ============================================================================
+# CSV EXPORT
+# ============================================================================
+
+@router.get("/export/csv")
 async def export_csv(
-    filters: ReportFilters,
+    start_date: str = None,
+    end_date: str = None,
     admin: dict = Depends(get_current_admin)
 ):
     """
-    Exporta dados em formato CSV
+    Exporta dados em CSV
     
-    Retorna arquivo CSV para download.
+    Gera arquivo CSV com todas as respostas e análises.
     """
-    responses = await supabase_service.get_responses_by_filters(
-        start_date=filters.start_date,
-        end_date=filters.end_date,
-        risk_level=filters.risk_level,
-        dimension=filters.dimension,
-        limit=10000  # Limite maior para export
-    )
+    from datetime import datetime
+    import csv
     
-    # Gerar CSV
+    start = datetime.fromisoformat(start_date) if start_date else None
+    end = datetime.fromisoformat(end_date) if end_date else None
+    
+    data = await supabase_service.export_for_ai(start, end)
+    
+    # Criar CSV em memória
     output = io.StringIO()
     
-    # Header
-    output.write("id,submitted_at,ip_address,completion_time_seconds,")
-    output.write("score_demandas,score_controle,score_relacionamento,")
-    output.write("score_cargo,score_mudanca,score_apoio_chefia,score_apoio_colegas,")
-    output.write("risk_demandas,risk_controle,risk_relacionamento,")
-    output.write("risk_cargo,risk_mudanca,risk_apoio_chefia,risk_apoio_colegas\n")
+    if not data:
+        raise HTTPException(status_code=404, detail="Nenhum dado para exportar")
     
-    # Data
-    for r in responses:
-        output.write(f"{r['id']},{r['submitted_at']},{r['ip_address']},")
-        output.write(f"{r['completion_time_seconds']},")
-        output.write(f"{r['score_demandas']},{r['score_controle']},")
-        output.write(f"{r['score_relacionamento']},{r['score_cargo']},")
-        output.write(f"{r['score_mudanca']},{r['score_apoio_chefia']},")
-        output.write(f"{r['score_apoio_colegas']},")
-        output.write(f"{r['risk_demandas']},{r['risk_controle']},")
-        output.write(f"{r['risk_relacionamento']},{r['risk_cargo']},")
-        output.write(f"{r['risk_mudanca']},{r['risk_apoio_chefia']},")
-        output.write(f"{r['risk_apoio_colegas']}\n")
+    # Headers
+    fieldnames = [
+        'id', 'submitted_at', 'ip_address',
+        'score_demandas', 'risk_demandas',
+        'score_controle', 'risk_controle',
+        'score_relacionamento', 'risk_relacionamento',
+        'score_cargo', 'risk_cargo',
+        'score_mudanca', 'risk_mudanca',
+        'score_apoio_chefia', 'risk_apoio_chefia',
+        'score_apoio_colegas', 'risk_apoio_colegas',
+        'completion_time_seconds'
+    ]
     
-    # Retornar como streaming response
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    
+    for item in data:
+        row = {
+            'id': item['response_id'],
+            'submitted_at': item['submitted_at'],
+            'ip_address': item.get('ip_address', ''),
+            'completion_time_seconds': item.get('completion_time_seconds', 0)
+        }
+        
+        # Adicionar scores e risks
+        for dim in ['demandas', 'controle', 'relacionamento', 'cargo', 'mudanca', 'apoio_chefia', 'apoio_colegas']:
+            row[f'score_{dim}'] = item['scores'].get(dim, 0)
+            row[f'risk_{dim}'] = item['risks'].get(dim, '')
+        
+        writer.writerow(row)
+    
+    # Preparar resposta
     output.seek(0)
+    
     return StreamingResponse(
-        io.BytesIO(output.getvalue().encode("utf-8")),
+        iter([output.getvalue()]),
         media_type="text/csv",
         headers={
-            "Content-Disposition": "attachment; filename=riscos_psicossociais.csv"
+            "Content-Disposition": f"attachment; filename=riscos_psicossociais_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         }
     )
-
-# ============================================================================
-# HEALTH CHECK
-# ============================================================================
-
-@router.get("/health")
-async def admin_health(admin: dict = Depends(get_current_admin)):
-    """Health check do serviço admin (requer autenticação)"""
-    return {
-        "status": "healthy",
-        "service": "admin",
-        "admin_email": admin["email"]
-    }
