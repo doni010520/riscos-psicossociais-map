@@ -1,7 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
 @layer base {
   :root {
     --background: 222 47% 5%;
@@ -26,7 +25,6 @@
     --radius: 1rem;
   }
 }
-
 @layer base {
   * {
     @apply border-border;
@@ -37,12 +35,10 @@
     background-attachment: fixed;
   }
 }
-
 @layer utilities {
   .animate-fadeIn {
     animation: fadeIn 0.3s ease-in;
   }
-
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -54,7 +50,6 @@
     }
   }
 }
-
 /* Glassmorphism Effects - Estilo Apple */
 @layer components {
   .glass {
@@ -84,6 +79,7 @@
     height: 200%;
     background: radial-gradient(circle, rgba(96, 165, 250, 0.1) 0%, transparent 70%);
     animation: water-ripple 4s ease-in-out infinite;
+    pointer-events: none;
   }
   
   @keyframes water-ripple {
@@ -124,27 +120,22 @@
     }
   }
 }
-
 /* Scrollbar customizada - Dark */
 ::-webkit-scrollbar {
   width: 10px;
 }
-
 ::-webkit-scrollbar-track {
   background: rgba(15, 23, 42, 0.5);
   backdrop-filter: blur(10px);
 }
-
 ::-webkit-scrollbar-thumb {
   background: rgba(59, 130, 246, 0.5);
   border-radius: 5px;
   backdrop-filter: blur(10px);
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(96, 165, 250, 0.7);
 }
-
 /* Transições suaves */
 * {
   @apply transition-colors duration-200;
