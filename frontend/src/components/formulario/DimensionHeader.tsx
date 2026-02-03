@@ -1,14 +1,27 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { DimensionHeaderProps } from '@/types';
 import { DIMENSION_DESCRIPTIONS } from '@/lib/questions';
 
 export function DimensionHeader({ dimension, isExpanded, onToggle }: DimensionHeaderProps) {
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  const handleToggle = () => {
+    onToggle();
+
+    // Se vai expandir, scrolla o header pro topo da tela após o render
+    if (!isExpanded) {
+      setTimeout(() => {
+        headerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  };
+
   return (
-    <div className="glass-card overflow-hidden">
+    <div ref={headerRef} className="glass-card overflow-hidden">
       <button
-        onClick={onToggle}
+        onClick={handleToggle}
         className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-white/10 transition-all"
       >
         <div className="flex-1">
